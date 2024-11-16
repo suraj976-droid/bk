@@ -1,0 +1,43 @@
+app.post("/getticketendcustomer", async (req, res) => {
+  let { searchparam } = req.body;
+
+  if (searchparam === "") {
+    return res.json([]);
+  }
+
+  try {
+    // Use the poolPromise to get the connection pool
+    const pool = await poolPromise;
+    const sql = `
+SELECT c.*, 
+       l.address, 
+       CONCAT(c.customer_fname, ' ', c.customer_lname) AS customer_name
+FROM awt_customer AS c 
+LEFT JOIN awt_customerlocation AS l ON c.id = l.customer_id 
+WHERE c.deleted = 0 
+  AND (c.email LIKE '%${searchparam}%' 
+       OR c.mobileno LIKE '%${searchparam}%')
+
+
+    `;
+
+    const result = await pool.request().query(sql);
+
+    // Product of End Customer using customer_id | in Table awt_customer id is primary key and customer_id is foreign key in awt_customerlocation
+    const sql1 = `
+    SELECT * FROM awt_uniqueproductmaster
+    WHERE deleted = 0 AND customer_id = @customerId
+  `;
+// console.log(result.recordset[0])
+  const result1 = await pool.request()
+    .input('customerId', result.recordset[0].id)
+    .query(sql1);
+
+
+    
+    return res.json({ information : result.recordset ,product : result1.recordset});
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'An error occurred while fetching data' });
+  }
+});
